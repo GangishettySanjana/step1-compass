@@ -1,69 +1,135 @@
-import Image from "next/image";
+"use client";
+
+import { AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+import { IntentionBanner } from "@/components/IntentionBanner";
+import { ProgressGraph } from "@/components/ProgressGraph";
+import { QuizPanel } from "@/components/QuizPanel";
+import { TaskCard } from "@/components/TaskCard";
+import type { ProgressStats, TopicRow } from "@/lib/schedule";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
 
 export default function Home() {
+  const [topics, setTopics] = useState<TopicRow[] | null>(null);
+  const [stats, setStats] = useState<ProgressStats | null>(null);
+  const [intention, setIntention] = useState<string | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  const loadToday = useCallback(async () => {
+    const res = await fetch("/api/today");
+    const data = await res.json();
+    setTopics(data.topics);
+  }, []);
+
+  const loadProgress = useCallback(async () => {
+    const res = await fetch("/api/progress");
+    setStats(await res.json());
+  }, []);
+
+  useEffect(() => {
+    async function init() {
+      await Promise.all([loadToday(), loadProgress()]);
+      const res = await fetch("/api/intention");
+      const data = await res.json();
+      setIntention(data.text);
+    }
+    init();
+  }, [loadToday, loadProgress]);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
+  async function enablePush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    setPushEnabled(true);
+  }
+
+  async function handleComplete(id: number) {
+    setTopics((t) => t?.map((x) => (x.id === id ? { ...x, status: "done" } : x)) ?? t);
+    await fetch(`/api/topics/${id}/complete`, { method: "POST" });
+    loadToday();
+    loadProgress();
+  }
+
+  async function handleSwap(id: number) {
+    const res = await fetch(`/api/topics/${id}/swap`, { method: "POST" });
+    const data = await res.json();
+    setTopics(data.topics);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main className="min-h-screen px-4 py-8 sm:px-6 md:py-12">
+      <div className="max-w-xl mx-auto space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
+            Step 1 Compass
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+          {!pushEnabled && (
+            <button
+              onClick={enablePush}
+              className="text-xs"
+              style={{ color: "var(--muted)" }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Enable reminders
+            </button>
+          )}
+        </header>
+
+        <IntentionBanner text={intention} />
+        <ProgressGraph stats={stats} />
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium" style={{ color: "var(--muted)" }}>
+              Today&apos;s tasks
+            </h2>
+            <button
+              onClick={() => setShowQuiz((v) => !v)}
+              className="text-xs"
+              style={{ color: "var(--accent)" }}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              {showQuiz ? "Hide quiz" : "Take self-check quiz"}
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <AnimatePresence>
+              {topics?.map((t) => (
+                <TaskCard key={t.id} topic={t} onComplete={handleComplete} onSwap={handleSwap} />
+              ))}
+            </AnimatePresence>
+            {topics?.length === 0 && (
+              <p className="text-sm" style={{ color: "var(--muted)" }}>
+                Nothing scheduled yet — check back tomorrow.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {showQuiz && <QuizPanel onClose={() => setShowQuiz(false)} />}
+      </div>
+    </main>
   );
 }
