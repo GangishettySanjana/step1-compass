@@ -102,6 +102,19 @@ export default function Home() {
     setTopics(data.topics);
   }
 
+  async function handleReset() {
+    const confirmed = window.confirm(
+      "Reset all progress? This clears every checked-off topic, quiz history, and NBME scores — the topic bank itself stays. This can't be undone."
+    );
+    if (!confirmed) return;
+    await fetch("/api/reset", { method: "POST" });
+    setIntention(null);
+    await Promise.all([loadToday(), loadProgress()]);
+    const res = await fetch("/api/intention");
+    const data = await res.json();
+    setIntention(data.text);
+  }
+
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 md:py-12">
       <div className="max-w-xl mx-auto space-y-6">
@@ -110,20 +123,29 @@ export default function Home() {
             <h1 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
               Step 1 Compass
             </h1>
-            {!pushEnabled && (
+            <div className="flex items-center gap-3">
+              {!pushEnabled && (
+                <button
+                  onClick={enablePush}
+                  className="text-xs"
+                  style={{ color: "var(--muted)" }}
+                >
+                  Enable reminders
+                </button>
+              )}
+              {pushEnabled && (
+                <span className="text-xs" style={{ color: "var(--accent)" }}>
+                  Reminders on
+                </span>
+              )}
               <button
-                onClick={enablePush}
+                onClick={handleReset}
                 className="text-xs"
                 style={{ color: "var(--muted)" }}
               >
-                Enable reminders
+                Reset progress
               </button>
-            )}
-            {pushEnabled && (
-              <span className="text-xs" style={{ color: "var(--accent)" }}>
-                Reminders on
-              </span>
-            )}
+            </div>
           </div>
           {pushStatus && (
             <p className="text-xs mt-1 text-right" style={{ color: "var(--rose)" }}>

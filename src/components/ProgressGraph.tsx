@@ -8,7 +8,7 @@ import type { ProgressStats } from "@/lib/schedule";
 const W = 400;
 const H = 190;
 const PAD_LEFT = 30;
-const PAD_RIGHT = 8;
+const PAD_RIGHT = 20;
 const PAD_TOP = 10;
 const PAD_BOTTOM = 22;
 
@@ -28,17 +28,25 @@ export function ProgressGraph({ stats }: { stats: ProgressStats | null }) {
     const idealPoints: [number, number][] = stats.series.map((s, i) => [xAt(i), yAt(s.ideal)]);
     const actualPoints: [number, number][] = stats.series.map((s, i) => [xAt(i), yAt(s.actual)]);
 
-    const idealDrawable = gen.curve(idealPoints, {
+    // Ideal pace is mathematically a straight line — draw it as one clean
+    // hand-drawn stroke between the two endpoints rather than tracing every
+    // daily point, which otherwise compounds sketch-jitter into noise.
+    const idealStart = idealPoints[0];
+    const idealEnd = idealPoints.at(-1)!;
+    const idealDrawable = gen.line(idealStart[0], idealStart[1], idealEnd[0], idealEnd[1], {
       stroke: "var(--muted)",
       strokeWidth: 1.5,
-      roughness: 1.2,
-      bowing: 0.6,
+      roughness: 0.8,
+      bowing: 0.3,
     });
-    const actualDrawable = gen.curve(actualPoints, {
+    // Actual is a real cumulative step series, so it needs every point —
+    // linearPath (straight sketchy segments) reads calmer at this density
+    // than a splined curve with roughness layered on top.
+    const actualDrawable = gen.linearPath(actualPoints, {
       stroke: "var(--accent)",
-      strokeWidth: 2.75,
-      roughness: 1.7,
-      bowing: 1,
+      strokeWidth: 2.5,
+      roughness: 0.9,
+      bowing: 0.3,
     });
 
     const lastActual = actualPoints.at(-1);

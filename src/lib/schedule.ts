@@ -280,3 +280,21 @@ export async function recordNbmeScore(
     UPDATE nbme_results SET score = ${score}, exam_date = ${examDate} WHERE id = ${id}
   `;
 }
+
+// Clears all progress (completions, assignments, weak flags, quiz history,
+// NBME scores, cached intentions) back to a fresh start. The topic bank
+// itself is untouched — this is for wiping test data, not re-seeding.
+export async function resetAllProgress(): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE topics SET
+      status = 'pending',
+      assigned_date = NULL,
+      deferred_until = NULL,
+      done_date = NULL,
+      weak = FALSE
+  `;
+  await sql`UPDATE nbme_results SET score = NULL, exam_date = NULL`;
+  await sql`DELETE FROM quiz_results`;
+  await sql`DELETE FROM intention_cache`;
+}
