@@ -11,7 +11,7 @@ export async function sendReminderEmail(opts: {
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not set — add a free key from resend.com");
+    throw new Error("RESEND_API_KEY is not set. Add a free key from resend.com");
   }
   const resend = new Resend(apiKey);
   const from = process.env.REMINDER_FROM_EMAIL || "Step 1 Compass <onboarding@resend.dev>";

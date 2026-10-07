@@ -7,7 +7,7 @@ const FREE_MODEL = "meta-llama/llama-3.1-8b-instruct:free";
 async function callOpenRouter(messages: { role: string; content: string }[]): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is not set — add a free key from openrouter.ai/keys");
+    throw new Error("OPENROUTER_API_KEY is not set. Add a free key from openrouter.ai/keys");
   }
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {

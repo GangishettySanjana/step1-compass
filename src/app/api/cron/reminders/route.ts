@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   const body =
     kind === "morning"
       ? `Today: ${names.join(", ")}`
-      : `Nothing checked off yet today — ${names.join(", ")} still waiting.`;
+      : `Nothing checked off yet today. ${names.join(", ")} still waiting.`;
 
   const recipients = (process.env.REMINDER_EMAILS || "")
     .split(",")

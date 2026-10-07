@@ -29,7 +29,7 @@ export async function GET() {
       periodEnd,
       topics: [],
       questions: [],
-      message: "No topics completed yet in this window — nothing to quiz on.",
+      message: "No topics completed yet in this window, nothing to quiz on.",
     });
   }
 

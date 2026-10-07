@@ -85,9 +85,9 @@ export default function Home() {
       setPushEnabled(true);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setPushStatus("Notifications were blocked — allow them in your browser's site settings to enable.");
+        setPushStatus("Notifications were blocked. Allow them in your browser's site settings to enable.");
       } else {
-        setPushStatus("Couldn't enable reminders right now — try again shortly.");
+        setPushStatus("Couldn't enable reminders right now. Try again shortly.");
       }
     }
   }
@@ -177,7 +177,7 @@ export default function Home() {
             </AnimatePresence>
             {topics?.length === 0 && (
               <p className="text-sm" style={{ color: "var(--muted)" }}>
-                Nothing scheduled yet — check back tomorrow.
+                Nothing scheduled yet. Check back tomorrow.
               </p>
             )}
           </div>

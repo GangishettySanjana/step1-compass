@@ -22,7 +22,7 @@ export async function GET() {
 
   let text: string;
   try {
-    text = names.length > 0 ? await generateIntention(names) : "Today's a light day — a good day to catch up or get ahead.";
+    text = names.length > 0 ? await generateIntention(names) : "Today's a light day, a good day to catch up or get ahead.";
   } catch {
     // Free-tier model hiccup or missing key — fall back gracefully rather
     // than breaking the dashboard.

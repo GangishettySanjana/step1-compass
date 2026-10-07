@@ -77,7 +77,7 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
       {state === "idle" && (
         <div>
           <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
-            A quick self-check on what you&apos;ve studied recently — not a replacement for your
+            A quick self-check on what you&apos;ve studied recently. Not a replacement for your
             UWorld/NBME practice.
           </p>
           <button
@@ -98,7 +98,7 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
 
       {state === "empty" && (
         <p className="text-sm" style={{ color: "var(--muted)" }}>
-          No topics completed in this window yet — finish a few topics first.
+          No topics completed in this window yet. Finish a few topics first.
         </p>
       )}
 
@@ -153,9 +153,9 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
             {questions.map((q, i) => (
               <p key={i} className="text-xs" style={{ color: "var(--muted)" }}>
                 <span style={{ color: answers[i] === q.correctIndex ? "var(--accent)" : "var(--rose)" }}>
-                  {answers[i] === q.correctIndex ? "Correct" : "Missed"}
+                  {answers[i] === q.correctIndex ? "Correct:" : "Missed:"}
                 </span>{" "}
-                — {q.explanation}
+                {q.explanation}
               </p>
             ))}
           </div>

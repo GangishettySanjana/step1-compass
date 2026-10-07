@@ -104,7 +104,7 @@ export function ProgressGraph({ stats }: { stats: ProgressStats | null }) {
           }}
         >
           {stats.doneCount} / {stats.totalTopics} topics
-          {chart.behind ? " — behind pace" : " — on pace"}
+          {chart.behind ? ", behind pace" : ", on pace"}
         </span>
       </div>
 
@@ -167,7 +167,7 @@ export function ProgressGraph({ stats }: { stats: ProgressStats | null }) {
       {stats.nbme.length > 0 && (
         <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
           <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>
-            NBME practice exams — scheduled checkpoints, not daily tasks. Log a score once taken.
+            NBME practice exams: scheduled checkpoints, not daily tasks. Log a score once taken.
           </p>
           <div className="flex flex-wrap gap-2">
             {stats.nbme.map((n) => (
