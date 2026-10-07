@@ -29,6 +29,10 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
       const data = await res.json();
       setPeriod({ start: data.periodStart, end: data.periodEnd });
       setIsPreview(Boolean(data.isPreview));
+      if (!res.ok || data.error) {
+        setState("error");
+        return;
+      }
       if (!data.questions || data.questions.length === 0) {
         setState("empty");
         return;
