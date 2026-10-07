@@ -40,6 +40,9 @@ yarn-error.log*
 # local embedded-Postgres preview data (never used in production)
 .pglite-data
 
+# local AI tooling metadata, not part of the app
+.serena
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
