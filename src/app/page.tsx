@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IntentionBanner } from "@/components/IntentionBanner";
 import { ProgressGraph } from "@/components/ProgressGraph";
 import { QuizPanel } from "@/components/QuizPanel";
@@ -21,6 +21,13 @@ export default function Home() {
   const [intention, setIntention] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const quizRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (showQuiz) {
+      quizRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [showQuiz]);
 
   const loadToday = useCallback(async () => {
     const res = await fetch("/api/today");
@@ -101,18 +108,9 @@ export default function Home() {
         <ProgressGraph stats={stats} />
 
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium" style={{ color: "var(--muted)" }}>
-              Today&apos;s tasks
-            </h2>
-            <button
-              onClick={() => setShowQuiz((v) => !v)}
-              className="text-xs"
-              style={{ color: "var(--accent)" }}
-            >
-              {showQuiz ? "Hide quiz" : "Take self-check quiz"}
-            </button>
-          </div>
+          <h2 className="text-sm font-medium mb-3" style={{ color: "var(--muted)" }}>
+            Today&apos;s tasks
+          </h2>
 
           <div className="space-y-3">
             <AnimatePresence>
@@ -128,7 +126,18 @@ export default function Home() {
           </div>
         </section>
 
-        {showQuiz && <QuizPanel onClose={() => setShowQuiz(false)} />}
+        <div ref={quizRef}>
+          {!showQuiz && (
+            <button
+              onClick={() => setShowQuiz(true)}
+              className="w-full text-sm font-medium px-4 py-3 rounded-full transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              Take self-check quiz
+            </button>
+          )}
+          {showQuiz && <QuizPanel onClose={() => setShowQuiz(false)} />}
+        </div>
       </div>
     </main>
   );

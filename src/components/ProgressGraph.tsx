@@ -27,7 +27,11 @@ export function ProgressGraph({ stats }: { stats: ProgressStats | null }) {
     Actual: s.actual,
   }));
 
-  const behind = stats.doneCount < (stats.series.at(-1)?.ideal ?? 0);
+  // Compare against TODAY's target on the pace line, not the final one at
+  // Nov 30 — otherwise this reads "behind pace" for the entire plan.
+  const todayPoint =
+    stats.series.find((s) => s.date === stats.todayISO) ?? stats.series.at(-1);
+  const behind = stats.doneCount < (todayPoint?.ideal ?? 0);
 
   return (
     <div className="rounded-2xl p-6" style={{ background: "var(--surface)" }}>
