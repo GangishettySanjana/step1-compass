@@ -76,27 +76,37 @@ export function pickBalanced<T extends { difficulty: Difficulty }>(
   return picks;
 }
 
-export async function seedIfEmpty(): Promise<void> {
-  await ensureSchema();
-  const sql = getSql();
-  const [{ count }] = (await sql`SELECT COUNT(*)::int AS count FROM topics`) as {
-    count: number;
-  }[];
-  if (count > 0) return;
+// Guarded by a single shared promise so concurrent requests (the dashboard
+// fires /api/today, /api/progress, and /api/intention in parallel on load)
+// can't all race in and seed the ~170 topics multiple times at once.
+let seedReady: Promise<void> | null = null;
 
-  for (const t of SEED_TOPICS) {
-    await sql`
-      INSERT INTO topics (name, system, system_order, difficulty)
-      VALUES (${t.name}, ${t.system}, ${t.systemOrder}, ${t.difficulty})
-    `;
+export function seedIfEmpty(): Promise<void> {
+  if (!seedReady) {
+    seedReady = (async () => {
+      await ensureSchema();
+      const sql = getSql();
+      const [{ count }] = (await sql`SELECT COUNT(*)::int AS count FROM topics`) as {
+        count: number;
+      }[];
+      if (count > 0) return;
+
+      for (const t of SEED_TOPICS) {
+        await sql`
+          INSERT INTO topics (name, system, system_order, difficulty)
+          VALUES (${t.name}, ${t.system}, ${t.systemOrder}, ${t.difficulty})
+        `;
+      }
+      for (let i = 0; i < NBME_MILESTONES.length; i++) {
+        const m = NBME_MILESTONES[i];
+        await sql`
+          INSERT INTO nbme_results (name, planned_month, sort_order)
+          VALUES (${m.name}, ${m.month}, ${i})
+        `;
+      }
+    })();
   }
-  for (let i = 0; i < NBME_MILESTONES.length; i++) {
-    const m = NBME_MILESTONES[i];
-    await sql`
-      INSERT INTO nbme_results (name, planned_month, sort_order)
-      VALUES (${m.name}, ${m.month}, ${i})
-    `;
-  }
+  return seedReady;
 }
 
 const WINDOW_MULTIPLIER = 4;

@@ -8,7 +8,8 @@ function connectionString(): string {
   if (!url) {
     throw new Error(
       "No database connection string found. Add a free Postgres database " +
-        "from the Vercel project's Storage tab (Neon) — it sets DATABASE_URL automatically."
+        "from the Vercel project's Storage tab (Neon) — it sets DATABASE_URL automatically. " +
+        "For local dev, copy that same connection string into .env.local as DATABASE_URL."
     );
   }
   return url;
