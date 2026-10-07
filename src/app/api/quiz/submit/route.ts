@@ -6,6 +6,7 @@ interface SubmitBody {
   periodStart: string;
   periodEnd: string;
   topics: string[];
+  isPreview?: boolean;
   answers: { topic: string; correct: boolean }[];
 }
 
@@ -27,7 +28,12 @@ export async function POST(req: Request) {
     VALUES (${body.periodStart}, ${body.periodEnd}, ${score}, ${total}, ${body.topics}, ${weakTopics})
   `;
 
-  await markTopicsWeak(weakTopics);
+  // A preview quiz covers topics that haven't been studied yet, so a wrong
+  // answer there doesn't mean the student is weak on it, just that they
+  // haven't gotten to it.
+  if (!body.isPreview) {
+    await markTopicsWeak(weakTopics);
+  }
 
   return NextResponse.json({ ok: true, score, total, weakTopics });
 }

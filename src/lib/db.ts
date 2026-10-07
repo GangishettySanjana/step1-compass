@@ -39,9 +39,13 @@ export function ensureSchema(): Promise<void> {
           deferred_until DATE,
           done_date DATE,
           weak BOOLEAN NOT NULL DEFAULT FALSE,
+          notes TEXT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // Table already existed in production before `notes` was added —
+      // CREATE TABLE IF NOT EXISTS above won't retroactively add it.
+      await sql`ALTER TABLE topics ADD COLUMN IF NOT EXISTS notes TEXT`;
       await sql`CREATE INDEX IF NOT EXISTS topics_status_idx ON topics (status)`;
       await sql`CREATE INDEX IF NOT EXISTS topics_assigned_date_idx ON topics (assigned_date)`;
 

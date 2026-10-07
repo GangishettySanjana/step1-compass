@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Clock } from "lucide-react";
+import { useState } from "react";
 import type { TopicRow } from "@/lib/schedule";
 
 const DIFFICULTY_LABEL: Record<TopicRow["difficulty"], string> = {
@@ -24,11 +25,19 @@ export function TaskCard({
   onSwap,
 }: {
   topic: TopicRow;
-  onComplete: (id: number) => void;
+  onComplete: (id: number, note: string) => void;
   onSwap: (id: number) => void;
 }) {
   const done = topic.status === "done";
   const style = DIFFICULTY_STYLE[topic.difficulty];
+  const [noteMode, setNoteMode] = useState(false);
+  const [note, setNote] = useState("");
+
+  function confirmDone() {
+    onComplete(topic.id, note.trim());
+    setNoteMode(false);
+    setNote("");
+  }
 
   return (
     <motion.div
@@ -63,6 +72,11 @@ export function TaskCard({
           <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
             {topic.system}
           </p>
+          {done && topic.notes && (
+            <p className="text-xs mt-1.5 italic" style={{ color: "var(--muted)" }}>
+              &ldquo;{topic.notes}&rdquo;
+            </p>
+          )}
         </div>
 
         {done && (
@@ -77,9 +91,10 @@ export function TaskCard({
         )}
       </div>
 
-      <AnimatePresence>
-        {!done && (
+      <AnimatePresence mode="wait">
+        {!done && !noteMode && (
           <motion.div
+            key="actions"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -94,13 +109,57 @@ export function TaskCard({
               Skip to tomorrow
             </button>
             <button
-              onClick={() => onComplete(topic.id)}
+              onClick={() => setNoteMode(true)}
               className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-medium transition-transform hover:scale-[1.02] active:scale-95"
               style={{ background: "var(--accent)", color: "white" }}
             >
               <Check size={15} />
               Done
             </button>
+          </motion.div>
+        )}
+
+        {!done && noteMode && (
+          <motion.div
+            key="note"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 overflow-hidden"
+          >
+            <textarea
+              autoFocus
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What did you cover? (optional, helps make better quiz questions)"
+              rows={2}
+              className="w-full text-sm rounded-xl p-3 resize-none"
+              style={{
+                background: "var(--surface-muted)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border)",
+              }}
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => {
+                  setNoteMode(false);
+                  setNote("");
+                }}
+                className="flex-1 rounded-full py-2 text-sm font-medium"
+                style={{ background: "var(--surface-muted)", color: "var(--muted)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDone}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-medium"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                <Check size={15} />
+                Mark done
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

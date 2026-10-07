@@ -1,6 +1,10 @@
 import { addDays, differenceInCalendarDays, format } from "date-fns";
-import { ensureSchema, getSql } from "./db";
+import { ensureSchema, getSetting, getSql, setSetting } from "./db";
 import { NBME_MILESTONES, SEED_TOPICS, type Difficulty } from "./seed-data";
+
+const DAILY_COUNT_SETTING_KEY = "daily_topic_count";
+const MIN_DAILY_COUNT = 1;
+const MAX_DAILY_COUNT = 8;
 
 export const FIRST_PASS_START = "2026-10-07";
 export const FIRST_PASS_END = "2026-11-30";
@@ -15,8 +19,32 @@ export function phaseForDate(dateStr: string): Phase {
   return dateStr < REVISION_START ? "first_pass" : "revision";
 }
 
-export function targetCountForPhase(phase: Phase): number {
+function defaultCountForPhase(phase: Phase): number {
   return phase === "first_pass" ? 3 : 4;
+}
+
+// How many topics get assigned per day. Defaults by phase, but the user can
+// override it (one global number, applies to both phases) from the
+// dashboard — see /api/settings/daily-count.
+export async function getTargetCount(phase: Phase): Promise<number> {
+  const raw = await getSetting(DAILY_COUNT_SETTING_KEY);
+  const n = raw ? Number(raw) : NaN;
+  if (Number.isInteger(n) && n >= MIN_DAILY_COUNT && n <= MAX_DAILY_COUNT) {
+    return n;
+  }
+  return defaultCountForPhase(phase);
+}
+
+export async function setDailyTopicCount(count: number): Promise<number> {
+  const clamped = Math.min(Math.max(Math.round(count), MIN_DAILY_COUNT), MAX_DAILY_COUNT);
+  await setSetting(DAILY_COUNT_SETTING_KEY, String(clamped));
+  return clamped;
+}
+
+export async function getDailyTopicCountSetting(): Promise<number | null> {
+  const raw = await getSetting(DAILY_COUNT_SETTING_KEY);
+  const n = raw ? Number(raw) : NaN;
+  return Number.isInteger(n) ? n : null;
 }
 
 export function todayISO(): string {
@@ -34,6 +62,7 @@ export interface TopicRow {
   deferred_until: string | null;
   done_date: string | null;
   weak: boolean;
+  notes: string | null;
 }
 
 // Picks `target` topics out of an ordered candidate window, guaranteeing at
@@ -123,7 +152,7 @@ export async function getOrCreateToday(dateStr: string): Promise<TopicRow[]> {
   const pendingToday = todayRows.filter((r) => r.status === "pending");
   const doneToday = todayRows.filter((r) => r.status === "done");
   const phase = phaseForDate(dateStr);
-  const target = targetCountForPhase(phase);
+  const target = await getTargetCount(phase);
   const needed = target - (pendingToday.length + doneToday.length);
 
   if (needed > 0) {
@@ -156,12 +185,23 @@ export async function getOrCreateToday(dateStr: string): Promise<TopicRow[]> {
   `) as TopicRow[];
 }
 
-export async function markTopicDone(id: number, dateStr: string): Promise<void> {
+export async function markTopicDone(
+  id: number,
+  dateStr: string,
+  note?: string | null
+): Promise<void> {
   const sql = getSql();
-  await sql`
-    UPDATE topics SET status = 'done', done_date = ${dateStr}
-    WHERE id = ${id} AND status = 'pending'
-  `;
+  if (note !== undefined) {
+    await sql`
+      UPDATE topics SET status = 'done', done_date = ${dateStr}, notes = ${note || null}
+      WHERE id = ${id} AND status = 'pending'
+    `;
+  } else {
+    await sql`
+      UPDATE topics SET status = 'done', done_date = ${dateStr}
+      WHERE id = ${id} AND status = 'pending'
+    `;
+  }
 }
 
 export async function swapTopicToTomorrow(id: number, dateStr: string): Promise<void> {
@@ -257,11 +297,62 @@ export async function getProgressStats(dateStr: string): Promise<ProgressStats> 
   };
 }
 
-export async function getWeakTopicPool(): Promise<{ id: number; name: string }[]> {
+export interface QuizTopicSource {
+  name: string;
+  notes: string | null;
+  completed: boolean;
+}
+
+const RECENT_FALLBACK_LIMIT = 12;
+const TODAY_PREVIEW_LIMIT = 6;
+
+// What the quiz generator should draw on, with a three-level fallback so
+// "Generate quiz" never dead-ends:
+//   1. Topics actually completed within the requested window
+//   2. If none, the most recently completed topics regardless of date
+//   3. If literally nothing has ever been completed, today's assigned
+//      topics as a preview (not yet studied — flagged via `completed: false`
+//      so the UI can say so)
+export async function getQuizSource(
+  periodStart: string,
+  periodEnd: string,
+  todayDateStr: string
+): Promise<{ topics: QuizTopicSource[]; isPreview: boolean }> {
+  await seedIfEmpty();
   const sql = getSql();
-  return (await sql`
-    SELECT id, name FROM topics WHERE status = 'done' ORDER BY done_date DESC LIMIT 60
-  `) as { id: number; name: string }[];
+
+  const windowRows = (await sql`
+    SELECT DISTINCT name, notes FROM topics
+    WHERE status = 'done' AND done_date BETWEEN ${periodStart} AND ${periodEnd}
+  `) as { name: string; notes: string | null }[];
+  if (windowRows.length > 0) {
+    return {
+      topics: windowRows.map((r) => ({ ...r, completed: true })),
+      isPreview: false,
+    };
+  }
+
+  const recentRows = (await sql`
+    SELECT name, notes FROM topics
+    WHERE status = 'done'
+    ORDER BY done_date DESC LIMIT ${RECENT_FALLBACK_LIMIT}
+  `) as { name: string; notes: string | null }[];
+  if (recentRows.length > 0) {
+    return {
+      topics: recentRows.map((r) => ({ ...r, completed: true })),
+      isPreview: false,
+    };
+  }
+
+  const todayRows = (await sql`
+    SELECT name FROM topics
+    WHERE assigned_date = ${todayDateStr}
+    ORDER BY id LIMIT ${TODAY_PREVIEW_LIMIT}
+  `) as { name: string }[];
+  return {
+    topics: todayRows.map((r) => ({ name: r.name, notes: null, completed: false })),
+    isPreview: true,
+  };
 }
 
 export async function markTopicsWeak(names: string[]): Promise<void> {

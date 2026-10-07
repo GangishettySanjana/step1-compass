@@ -21,6 +21,7 @@ export default function Home() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [dailyCount, setDailyCount] = useState<number | null>(null);
   const quizRef = useRef<HTMLDivElement | null>(null);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,6 +45,9 @@ export default function Home() {
   useEffect(() => {
     async function init() {
       await Promise.all([loadToday(), loadProgress()]);
+      const res = await fetch("/api/settings/daily-count");
+      const data = await res.json();
+      setDailyCount(data.effective);
     }
     init();
   }, [loadToday, loadProgress]);
@@ -92,9 +96,15 @@ export default function Home() {
     }
   }
 
-  async function handleComplete(id: number) {
-    setTopics((t) => t?.map((x) => (x.id === id ? { ...x, status: "done" } : x)) ?? t);
-    await fetch(`/api/topics/${id}/complete`, { method: "POST" });
+  async function handleComplete(id: number, note: string) {
+    setTopics(
+      (t) => t?.map((x) => (x.id === id ? { ...x, status: "done", notes: note || null } : x)) ?? t
+    );
+    await fetch(`/api/topics/${id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    });
     loadToday();
     loadProgress();
   }
@@ -103,6 +113,17 @@ export default function Home() {
     const res = await fetch(`/api/topics/${id}/swap`, { method: "POST" });
     const data = await res.json();
     setTopics(data.topics);
+  }
+
+  async function changeDailyCount(delta: number) {
+    const next = Math.min(Math.max((dailyCount ?? 3) + delta, 1), 8);
+    setDailyCount(next);
+    await fetch("/api/settings/daily-count", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: next }),
+    });
+    loadToday();
   }
 
   // Two-tap confirm instead of window.confirm(), which is unreliable (or
@@ -165,9 +186,35 @@ export default function Home() {
         <ProgressGraph stats={stats} />
 
         <section>
-          <h2 className="text-sm font-medium mb-3" style={{ color: "var(--muted)" }}>
-            Today&apos;s tasks
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium" style={{ color: "var(--muted)" }}>
+              Today&apos;s tasks
+            </h2>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+              <span>Topics/day</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => changeDailyCount(-1)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ background: "var(--surface-muted)" }}
+                  aria-label="Fewer topics per day"
+                >
+                  −
+                </button>
+                <span className="w-4 text-center" style={{ color: "var(--foreground)" }}>
+                  {dailyCount ?? "…"}
+                </span>
+                <button
+                  onClick={() => changeDailyCount(1)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ background: "var(--surface-muted)" }}
+                  aria-label="More topics per day"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-3">
             <AnimatePresence>

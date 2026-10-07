@@ -20,6 +20,7 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
+  const [isPreview, setIsPreview] = useState(false);
 
   async function load() {
     setState("loading");
@@ -27,6 +28,7 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/quiz/generate");
       const data = await res.json();
       setPeriod({ start: data.periodStart, end: data.periodEnd });
+      setIsPreview(Boolean(data.isPreview));
       if (!data.questions || data.questions.length === 0) {
         setState("empty");
         return;
@@ -43,6 +45,7 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
       periodStart: period.start,
       periodEnd: period.end,
       topics: [...new Set(questions.map((q) => q.topic))],
+      isPreview,
       answers: questions.map((q, i) => ({
         topic: q.topic,
         correct: answers[i] === q.correctIndex,
@@ -110,6 +113,15 @@ export function QuizPanel({ onClose }: { onClose: () => void }) {
 
       {state === "ready" && !submitted && (
         <div className="space-y-5">
+          {isPreview && (
+            <p
+              className="text-xs px-3 py-2 rounded-lg"
+              style={{ background: "var(--amber-soft)", color: "var(--amber)" }}
+            >
+              Nothing&apos;s been marked done yet, so these are preview questions on today&apos;s
+              topics rather than a review of what you&apos;ve studied.
+            </p>
+          )}
           {questions.map((q, i) => (
             <div key={i}>
               <p className="text-sm mb-2" style={{ color: "var(--foreground)" }}>

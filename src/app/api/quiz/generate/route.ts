@@ -2,40 +2,31 @@ import { addDays, format } from "date-fns";
 import { NextResponse } from "next/server";
 import { connection } from "next/server";
 import { getSetting } from "@/lib/db";
-import { getSql, ensureSchema } from "@/lib/db";
 import { generateQuiz } from "@/lib/openrouter";
-import { todayISO } from "@/lib/schedule";
+import { getQuizSource, todayISO } from "@/lib/schedule";
 
 export async function GET() {
   await connection();
-  await ensureSchema();
-  const sql = getSql();
 
   const cadenceDaysRaw = await getSetting("quiz_cadence_days");
   const cadenceDays = cadenceDaysRaw ? Number(cadenceDaysRaw) : 7;
 
-  const periodEnd = todayISO();
+  const today = todayISO();
+  const periodEnd = today;
   const periodStart = format(addDays(new Date(periodEnd), -cadenceDays), "yyyy-MM-dd");
 
-  const rows = (await sql`
-    SELECT DISTINCT name FROM topics
-    WHERE status = 'done' AND done_date BETWEEN ${periodStart} AND ${periodEnd}
-  `) as { name: string }[];
-  const topicNames = rows.map((r) => r.name);
+  const { topics, isPreview } = await getQuizSource(periodStart, periodEnd, today);
+  const topicNames = topics.map((t) => t.name);
 
-  if (topicNames.length === 0) {
+  try {
+    const questions = await generateQuiz(topics);
     return NextResponse.json({
       periodStart,
       periodEnd,
-      topics: [],
-      questions: [],
-      message: "No topics completed yet in this window, nothing to quiz on.",
+      topics: topicNames,
+      questions,
+      isPreview,
     });
-  }
-
-  try {
-    const questions = await generateQuiz(topicNames);
-    return NextResponse.json({ periodStart, periodEnd, topics: topicNames, questions });
   } catch (err) {
     return NextResponse.json(
       {
@@ -43,6 +34,7 @@ export async function GET() {
         periodEnd,
         topics: topicNames,
         questions: [],
+        isPreview,
         error: err instanceof Error ? err.message : "Quiz generation failed",
       },
       { status: 502 }

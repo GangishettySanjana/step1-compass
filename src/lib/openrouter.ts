@@ -60,12 +60,27 @@ export interface QuizQuestion {
   explanation: string;
 }
 
-export async function generateQuiz(topicNames: string[]): Promise<QuizQuestion[]> {
+export interface QuizTopicInput {
+  name: string;
+  notes?: string | null;
+}
+
+export async function generateQuiz(topics: QuizTopicInput[]): Promise<QuizQuestion[]> {
+  const topicLines = topics
+    .map((t) =>
+      t.notes
+        ? `- ${t.name} (student's own notes on what they covered: "${t.notes}")`
+        : `- ${t.name}`
+    )
+    .join("\n");
+
   const content = await callOpenRouter([
     {
       role: "system",
       content:
         "You write USMLE Step 1 style multiple-choice self-check questions. " +
+        "When a topic includes the student's own notes on what they actually covered, " +
+        "ground the question in that specific material rather than the broader topic. " +
         "Respond with ONLY valid JSON: an array of objects with fields " +
         '"topic" (must exactly match one of the given topic names), "question", ' +
         '"choices" (array of 4 strings), "correctIndex" (0-3), "explanation" (1-2 sentences). ' +
@@ -73,9 +88,7 @@ export async function generateQuiz(topicNames: string[]): Promise<QuizQuestion[]
     },
     {
       role: "user",
-      content: `Write 2 questions for EACH of these topics, covering only these topics: ${topicNames.join(
-        ", "
-      )}`,
+      content: `Write 2 questions for EACH of these topics, covering only these topics:\n${topicLines}`,
     },
   ]);
 
