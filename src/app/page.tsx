@@ -21,6 +21,7 @@ export default function Home() {
   const [intention, setIntention] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
   const quizRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -57,20 +58,35 @@ export default function Home() {
   }, []);
 
   async function enablePush() {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    setPushStatus(null);
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("Push notifications aren't supported in this browser.");
+      return;
+    }
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!publicKey) return;
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sub.toJSON()),
-    });
-    setPushEnabled(true);
+    if (!publicKey) {
+      setPushStatus("Reminders aren't set up on this deployment yet (missing a config key).");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      setPushEnabled(true);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        setPushStatus("Notifications were blocked — allow them in your browser's site settings to enable.");
+      } else {
+        setPushStatus("Couldn't enable reminders right now — try again shortly.");
+      }
+    }
   }
 
   async function handleComplete(id: number) {
@@ -89,18 +105,30 @@ export default function Home() {
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 md:py-12">
       <div className="max-w-xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
-            Step 1 Compass
-          </h1>
-          {!pushEnabled && (
-            <button
-              onClick={enablePush}
-              className="text-xs"
-              style={{ color: "var(--muted)" }}
-            >
-              Enable reminders
-            </button>
+        <header>
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
+              Step 1 Compass
+            </h1>
+            {!pushEnabled && (
+              <button
+                onClick={enablePush}
+                className="text-xs"
+                style={{ color: "var(--muted)" }}
+              >
+                Enable reminders
+              </button>
+            )}
+            {pushEnabled && (
+              <span className="text-xs" style={{ color: "var(--accent)" }}>
+                Reminders on
+              </span>
+            )}
+          </div>
+          {pushStatus && (
+            <p className="text-xs mt-1 text-right" style={{ color: "var(--rose)" }}>
+              {pushStatus}
+            </p>
           )}
         </header>
 
