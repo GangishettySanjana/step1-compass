@@ -2,7 +2,6 @@
 
 import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IntentionBanner } from "@/components/IntentionBanner";
 import { ProgressGraph } from "@/components/ProgressGraph";
 import { QuizPanel } from "@/components/QuizPanel";
 import { TaskCard } from "@/components/TaskCard";
@@ -18,11 +17,12 @@ function urlBase64ToUint8Array(base64String: string) {
 export default function Home() {
   const [topics, setTopics] = useState<TopicRow[] | null>(null);
   const [stats, setStats] = useState<ProgressStats | null>(null);
-  const [intention, setIntention] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const quizRef = useRef<HTMLDivElement | null>(null);
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (showQuiz) {
@@ -44,9 +44,6 @@ export default function Home() {
   useEffect(() => {
     async function init() {
       await Promise.all([loadToday(), loadProgress()]);
-      const res = await fetch("/api/intention");
-      const data = await res.json();
-      setIntention(data.text);
     }
     init();
   }, [loadToday, loadProgress]);
@@ -55,6 +52,12 @@ export default function Home() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+    };
   }, []);
 
   async function enablePush() {
@@ -102,17 +105,22 @@ export default function Home() {
     setTopics(data.topics);
   }
 
-  async function handleReset() {
-    const confirmed = window.confirm(
-      "Reset all progress? This clears every checked-off topic, quiz history, and NBME scores — the topic bank itself stays. This can't be undone."
-    );
-    if (!confirmed) return;
+  // Two-tap confirm instead of window.confirm(), which is unreliable (or
+  // silently suppressed) inside installed PWAs in standalone display mode.
+  function handleResetClick() {
+    if (!confirmingReset) {
+      setConfirmingReset(true);
+      resetTimeoutRef.current = setTimeout(() => setConfirmingReset(false), 4000);
+      return;
+    }
+    if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+    setConfirmingReset(false);
+    performReset();
+  }
+
+  async function performReset() {
     await fetch("/api/reset", { method: "POST" });
-    setIntention(null);
     await Promise.all([loadToday(), loadProgress()]);
-    const res = await fetch("/api/intention");
-    const data = await res.json();
-    setIntention(data.text);
   }
 
   return (
@@ -139,11 +147,11 @@ export default function Home() {
                 </span>
               )}
               <button
-                onClick={handleReset}
-                className="text-xs"
-                style={{ color: "var(--muted)" }}
+                onClick={handleResetClick}
+                className="text-xs font-medium"
+                style={{ color: confirmingReset ? "var(--rose)" : "var(--muted)" }}
               >
-                Reset progress
+                {confirmingReset ? "Tap again to confirm" : "Reset progress"}
               </button>
             </div>
           </div>
@@ -154,7 +162,6 @@ export default function Home() {
           )}
         </header>
 
-        <IntentionBanner text={intention} />
         <ProgressGraph stats={stats} />
 
         <section>
